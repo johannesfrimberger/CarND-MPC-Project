@@ -6,7 +6,8 @@
 
 using namespace std;
 
-class MPC {
+class MPC
+{
 public:
     MPC();
     
@@ -18,6 +19,7 @@ public:
     
 private:
     
+    // Return options for IPOPT solver
     std::string getOptionsString() const;
     
     // options for IPOPT solver

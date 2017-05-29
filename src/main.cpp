@@ -72,25 +72,47 @@ int main() {
     MPC mpc;
     
     h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-                       uWS::OpCode opCode) {
+                       uWS::OpCode opCode)
+    {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
         string sdata = string(data).substr(0, length);
         cout << sdata << endl;
-        if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
+        if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2')
+        {
             string s = hasData(sdata);
             if (s != "") {
                 auto j = json::parse(s);
                 string event = j[0].get<string>();
-                if (event == "telemetry") {
+                if (event == "telemetry")
+                {
                     // j[1] is the data JSON object
-                    vector<double> ptsx = j[1]["ptsx"];
-                    vector<double> ptsy = j[1]["ptsy"];
-                    double px = j[1]["x"];
-                    double py = j[1]["y"];
-                    double psi = j[1]["psi"];
-                    double v = j[1]["speed"];
+                    const vector<double> ptsx = j[1]["ptsx"];
+                    const vector<double> ptsy = j[1]["ptsy"];
+                    const double px = j[1]["x"];
+                    const double py = j[1]["y"];
+                    const double psi = j[1]["psi"];
+                    const double v = j[1]["speed"];
+                    
+                    // Transform coordinats from map to vehicle CoSy
+                    const unsigned n_points = ptsx.size();
+                    Eigen::VectorXd ptsx_vehicle(n_points);
+                    Eigen::VectorXd ptsy_vehicle(n_points);
+                    
+                    for(unsigned i = 0U; i < n_points; i++)
+                    {
+                        ptsx_vehicle(i) = cos(psi) * (ptsx[i] - px) + sin(psi) * (ptsy[i] - py);
+                        ptsy_vehicle(i) = cos(psi) * (ptsy[i] - py) - sin(psi) * (ptsx[i] - px);
+                    }
+                    
+                    // Use a polynomial of 3 to fit the road
+                    const auto coeffs = polyfit(ptsx_vehicle, ptsy_vehicle, 3);
+                    const double cte = polyeval(coeffs, 0);
+                    const double epsi = -atan(coeffs[1]);
+                    
+                    Eigen::VectorXd state(6);
+                    state << px, py, psi, v, cte, epsi;
                     
                     /*
                      * TODO: Calculate steeering angle and throttle using MPC.
@@ -98,8 +120,10 @@ int main() {
                      * Both are in between [-1, 1].
                      *
                      */
-                    double steer_value;
-                    double throttle_value;
+                    const auto vars = mpc.Solve(state, coeffs);
+                    
+                    const double steer_value = vars[6];
+                    const double throttle_value = vars[7];
                     
                     json msgJson;
                     // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -118,15 +142,13 @@ int main() {
                     msgJson["mpc_y"] = mpc_y_vals;
                     
                     //Display the waypoints/reference line
-                    vector<double> next_x_vals;
-                    vector<double> next_y_vals;
+                    vector<double> next_x_vals(ptsx_vehicle.data(), ptsx_vehicle.data() + ptsx_vehicle.rows() * ptsx_vehicle.cols());
+                    vector<double> next_y_vals(ptsy_vehicle.data(), ptsy_vehicle.data() + ptsy_vehicle.rows() * ptsy_vehicle.cols());
                     
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Yellow line
-                    
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
-                    
                     
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                     std::cout << msg << std::endl;
@@ -142,7 +164,9 @@ int main() {
                     this_thread::sleep_for(chrono::milliseconds(100));
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
-            } else {
+            }
+            else
+            {
                 // Manual driving
                 std::string msg = "42[\"manual\",{}]";
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
