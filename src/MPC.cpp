@@ -6,8 +6,8 @@
 using CppAD::AD;
 
 // Set the timestep length and duration
-const size_t N = 25;
-const double dt = 0.05;
+const size_t N = 10;
+const double dt = 0.1;
 
 const size_t x_start = 0;
 const size_t y_start = x_start + N;
@@ -34,7 +34,7 @@ const double Lf = 2.67;
 // The reference velocity is set to 40 mph.
 const double ref_cte = 0;
 const double ref_epsi = 0;
-const double ref_v = 40;
+const double ref_v = 100;
 
 class FG_eval
 {
@@ -51,28 +51,26 @@ public:
         fg[0] = 0;
         
         // The part of the cost based on the reference state.
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < N; i++)
+        {
             fg[0] += CppAD::pow(vars[cte_start + i] - ref_cte, 2);
             fg[0] += CppAD::pow(vars[epsi_start + i] - ref_epsi, 2);
             fg[0] += CppAD::pow(vars[v_start + i] - ref_v, 2);
         }
         
         // Minimize the use of actuators.
-        for (int i = 0; i < N - 1; i++) {
+        for (int i = 0; i < N - 1; i++)
+        {
             fg[0] += CppAD::pow(vars[delta_start + i], 2);
             fg[0] += CppAD::pow(vars[a_start + i], 2);
         }
         
         // Minimize the value gap between sequential actuations.
-        for (int i = 0; i < N - 2; i++) {
+        for (int i = 0; i < N - 2; i++)
+        {
             fg[0] += CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
             fg[0] += CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
         }
-        
-        //
-        // Setup Constraints
-        //
-        // NOTE: In this section you'll setup the model constraints.
         
         // Initial constraints
         //
@@ -87,7 +85,8 @@ public:
         fg[1 + epsi_start] = vars[epsi_start];
         
         // The rest of the constraints
-        for (int i = 0; i < N - 1; i++) {
+        for (int i = 0; i < N - 1; i++)
+        {
             // The state at time t+1 .
             AD<double> x1 = vars[x_start + i + 1];
             AD<double> y1 = vars[y_start + i + 1];
