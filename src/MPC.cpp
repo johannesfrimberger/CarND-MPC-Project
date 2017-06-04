@@ -276,6 +276,6 @@ void MPC::Solve(const Eigen::VectorXd state, const Eigen::VectorXd coeffs, doubl
         mpc_y_vals.push_back(solution.x[y_start + i]);
     }
     
-    steering_angle = solution.x[delta_start];
+    steering_angle = -solution.x[delta_start];
     throttle = solution.x[a_start];
 }
