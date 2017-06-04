@@ -111,33 +111,40 @@ int main() {
                     const double cte = polyeval(coeffs, 0);
                     const double epsi = -atan(coeffs[1]);
                     
+                    // Read latest throttle and steering request
+                    const double steer_value = j[1]["steering_angle"];
+                    const double throttle_value = j[1]["throttle"];
+                    
+                    // Consider delay as
+                    const double latency = 0.1;
+                    const double Lf = 2.67;
+                    
+                    const double delay_x = v * latency; // Vehicle will be move
+                    const double delay_y = 0; // no y movement in vehicle CoSy
+                    const double delay_psi = -v * steer_value / Lf * latency;
+                    const double delay_v = v + throttle_value * latency;
+                    const double delay_cte = cte + v * sin(epsi) * latency;
+                    const double delay_epsi = epsi - v * steer_value / Lf * latency;
+                    
+                    // Set current state
                     Eigen::VectorXd state(6);
-                    state << px, py, psi, v, cte, epsi;
+                    state << delay_x, delay_y, delay_psi, delay_v, delay_cte, delay_epsi;
                     
-                    /*
-                     * TODO: Calculate steeering angle and throttle using MPC.
-                     *
-                     * Both are in between [-1, 1].
-                     *
-                     */
-                    const auto vars = mpc.Solve(state, coeffs);
-                    
-                    const double steer_value = vars[6];
-                    const double throttle_value = vars[7];
+                    // Calculate steeering angle and throttle using MPC.
+                    //Display the MPC predicted trajectory
+                    vector<double> mpc_x_vals;
+                    vector<double> mpc_y_vals;
+                    double mpc_steer_value, mpc_throttle_value;
+                    mpc.Solve(state, coeffs, mpc_steer_value, mpc_throttle_value, mpc_x_vals, mpc_y_vals);
                     
                     json msgJson;
                     // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-                    msgJson["steering_angle"] = steer_value;
-                    msgJson["throttle"] = throttle_value;
-                    
-                    //Display the MPC predicted trajectory
-                    vector<double> mpc_x_vals;
-                    vector<double> mpc_y_vals;
+                    msgJson["steering_angle"] = mpc_steer_value;
+                    msgJson["throttle"] = mpc_throttle_value;
                     
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Green line
-                    
                     msgJson["mpc_x"] = mpc_x_vals;
                     msgJson["mpc_y"] = mpc_y_vals;
                     
@@ -161,7 +168,8 @@ int main() {
                     //
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
                     // SUBMITTING.
-                    this_thread::sleep_for(chrono::milliseconds(100));
+                    const unsigned latency_in_ms = static_cast<unsigned>(latency * 1000.0);
+                    this_thread::sleep_for(chrono::milliseconds(latency_in_ms));
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             }
