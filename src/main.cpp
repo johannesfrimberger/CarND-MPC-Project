@@ -106,40 +106,40 @@ int main() {
                         ptsy_vehicle(i) = cos(psi) * (ptsy[i] - py) - sin(psi) * (ptsx[i] - px);
                     }
                     
-                    // Use a polynomial of 3 to fit the road
+                    // Use a polynomial of 3rd order to fit the road
                     const auto coeffs = polyfit(ptsx_vehicle, ptsy_vehicle, 3);
                     const double cte = polyeval(coeffs, 0);
                     const double epsi = -atan(coeffs[1]);
                     
-                    // Read latest throttle and steering request
+                    // Read latest throttle and steering requests
                     const double steer_value = j[1]["steering_angle"];
                     const double throttle_value = j[1]["throttle"];
                     
-                    // Consider delay as
+                    // Update current state as the control request is delayed due to latency
                     const double latency = 0.1;
                     const double Lf = 2.67;
                     
-                    const double delay_x = v * latency; // Vehicle will be move
-                    const double delay_y = 0; // no y movement in vehicle CoSy
-                    const double delay_psi = -v * steer_value / Lf * latency;
-                    const double delay_v = v + throttle_value * latency;
-                    const double delay_cte = cte + v * sin(epsi) * latency;
-                    const double delay_epsi = epsi - v * steer_value / Lf * latency;
+                    const double delayed_x = v * latency; // Vehicle will be at this position after control request has been sent
+                    const double delayed_y = 0; // no y movement within vehicle CoSy
+                    const double delayed_psi = -v * steer_value / Lf * latency; // Predict turn rate
+                    const double delayed_v = v + throttle_value * latency; // Estimate velocity (could be improved)
+                    const double delayed_cte = cte + v * sin(epsi) * latency; // Predict cross track error with current estimation, velcoity, orientation error  and delay
+                    const double delayed_epsi = epsi - v * steer_value / Lf * latency; // Estimate orientation error to be reduced with latest steering value
                     
                     // Set current state
                     Eigen::VectorXd state(6);
-                    state << delay_x, delay_y, delay_psi, delay_v, delay_cte, delay_epsi;
+                    state << delayed_x, delayed_y, delayed_psi, delayed_v, delayed_cte, delayed_epsi;
                     
                     // Calculate steeering angle and throttle using MPC.
                     //Display the MPC predicted trajectory
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
                     double mpc_steer_value, mpc_throttle_value;
+                    
                     mpc.Solve(state, coeffs, mpc_steer_value, mpc_throttle_value, mpc_x_vals, mpc_y_vals);
                     
+                    // Set up json message for control request
                     json msgJson;
-                    // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-                    // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
                     msgJson["steering_angle"] = mpc_steer_value;
                     msgJson["throttle"] = mpc_throttle_value;
                     
@@ -148,7 +148,7 @@ int main() {
                     msgJson["mpc_x"] = mpc_x_vals;
                     msgJson["mpc_y"] = mpc_y_vals;
                     
-                    //Display the waypoints/reference line
+                    // Display the waypoints/reference line
                     vector<double> next_x_vals(ptsx_vehicle.data(), ptsx_vehicle.data() + ptsx_vehicle.rows() * ptsx_vehicle.cols());
                     vector<double> next_y_vals(ptsy_vehicle.data(), ptsy_vehicle.data() + ptsy_vehicle.rows() * ptsy_vehicle.cols());
                     
