@@ -7,25 +7,33 @@ Self-Driving Car Engineer Nanodegree Program
 
 ### The Model
 
+The model consist of the following states:
 
 ```python
 x, # X-Position
 y, # Y-Position
-psi, #
+psi, # Orientation
 v, # Velocity
 cte, # Cross Track Error
 epsi # Orientation Error
 ```
 
-
 ### Timestep Length and Elapsed Duration (N & dt)
 
-The elapsed duration was chosen to fit the latency.
-This is not necessary
+The number of was chosen to be 10 which showed quite good results.
+When increasing this number the fit to the original line get's even better
+for small changes in the road direction. For sharper curves the systems
+fails to find a good steer request for this number of timesteps.
+Less time steps resulted in a rougher driver.
+
+The elapsed duration was chosen to fit the latency of the system.
 
 ### Polynomial Fitting and MPC Preprocessing
 
+We used a 3rd order polynom to fit the upcoming x- and y-points.
 
+Evaluating this polynom at position `x=0` gives us the cross track error
+and the 1st coefficient (slope) helps to evaluate the orientation error.
 
 ### Model Predictive Control with Latency
 
@@ -34,16 +42,16 @@ state estimation as an input directly. With a latency the control
 request is send at a time where the current state estimation is no longer
 the real state. Therefore we predict the current state at the time `t + latency`.
 
-```
-v * latency,
-0,
--v * steer_value / Lf * latency,
-v + throttle_value * latency,
-cte + v * sin(epsi) * latency,
-epsi - v * steer_value / Lf * latency
+This leads to an updated state:
+```python
+x_delayed = v * latency, # New x position in vehicle CoSy
+y_delayed = 0, # No y-movement in vehicle CoSy
+psi_delayed = -v * steer_value / Lf * latency, # Orientation in the vehicle CoSy is zero but changes with current steering
+v_delayed = v + throttle_value * latency, # Estimate v with throttle (this does not fit mathematically)
+cte_delayed = cte + v * sin(epsi) * latency, # Estimate cte with current movement and direction
+epsi_delayed = epsi - v * steer_value / Lf * latency # Estimate orientation error with current movement
 ```
 
-Wh
 
 ## Dependencies
 
