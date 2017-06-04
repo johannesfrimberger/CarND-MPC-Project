@@ -34,7 +34,7 @@ const double Lf = 2.67;
 // The reference velocity is set to 40 mph.
 const double ref_cte = 0;
 const double ref_epsi = 0;
-const double ref_v = 100;
+const double ref_v = 50;
 
 class FG_eval
 {
@@ -46,6 +46,15 @@ public:
     typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
     void operator()(ADvector& fg, const ADvector& vars)
     {
+        // Set weights for single components of the cost function
+        const double weight_cte = 1000.0;
+        const double weight_epsi = 100.0;
+        const double weight_v = 1.0;
+        const double weight_delta = 1.0;
+        const double weight_a = 30.0;
+        const double weight_change_delta = 100.0;
+        const double weight_change_a = 1.0;
+        
         // The cost is stored is the first element of `fg`.
         // Any additions to the cost should be added to `fg[0]`.
         fg[0] = 0;
@@ -53,23 +62,23 @@ public:
         // The part of the cost based on the reference state.
         for (int i = 0; i < N; i++)
         {
-            fg[0] += CppAD::pow(vars[cte_start + i] - ref_cte, 2);
-            fg[0] += CppAD::pow(vars[epsi_start + i] - ref_epsi, 2);
-            fg[0] += CppAD::pow(vars[v_start + i] - ref_v, 2);
+            fg[0] += weight_cte * CppAD::pow(vars[cte_start + i] - ref_cte, 2);
+            fg[0] += weight_epsi * CppAD::pow(vars[epsi_start + i] - ref_epsi, 2);
+            fg[0] += weight_v * CppAD::pow(vars[v_start + i] - ref_v, 2);
         }
         
         // Minimize the use of actuators.
         for (int i = 0; i < N - 1; i++)
         {
-            fg[0] += CppAD::pow(vars[delta_start + i], 2);
-            fg[0] += CppAD::pow(vars[a_start + i], 2);
+            fg[0] += weight_delta * CppAD::pow(vars[delta_start + i], 2);
+            fg[0] += weight_a * CppAD::pow(vars[a_start + i], 2);
         }
         
         // Minimize the value gap between sequential actuations.
         for (int i = 0; i < N - 2; i++)
         {
-            fg[0] += CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
-            fg[0] += CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
+            fg[0] += weight_change_delta * CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
+            fg[0] += weight_change_a * CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
         }
         
         // Initial constraints
@@ -107,8 +116,9 @@ public:
             AD<double> delta0 = vars[delta_start + i];
             AD<double> a0 = vars[a_start + i];
             
-            AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-            AD<double> psides0 = CppAD::atan(coeffs[1]);
+            // Evaluate f and psi for 3rd order polynomial
+            AD<double> f0 = coeffs[0] + (coeffs[1] * x0) + (coeffs[2] * pow(x0,2)) + (coeffs[3] * pow(x0,3));
+            AD<double> psides0 = CppAD::atan(coeffs[1] + (2 * coeffs[2] * x0) + (3 * coeffs[3]* pow(x0,2) ));
             
             // Here's `x` to get you started.
             // The idea here is to constraint this value to be 0.
